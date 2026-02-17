@@ -27,16 +27,13 @@ export default function Dashboard() {
   useEffect(() => {
     console.log("start");
     const accessToken = getCookie('token');
+    const id = getCookie('id');
     console.log(accessToken);
     // if (!accessToken) {
     //   window.location.href = '/login'
     // }
-    const id = localStorage.id;
     async function list() {
       try {
-        console.log("before fetch");
-        console.log();
-
         const res = await fetch(
           `http://94.131.118.165:3020/service/find?user_id=${id}`,
           {
