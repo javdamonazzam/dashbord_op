@@ -18,9 +18,9 @@ export default function AdminPage() {
         }
         return null;
     }
-    const accessToken = getCookie('token');
-
+    
     const handCreate = async () => {
+        const accessToken = getCookie('token');
         try {
             const res = await fetch('http://94.131.118.165:3020/user/create', {
                 method: 'POST',
