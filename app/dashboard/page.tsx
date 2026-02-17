@@ -1,38 +1,44 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
-type Card = {
-  id: number
-  name: string
-  date: string
-}
+
+type Service = {
+  id: number;
+  name: string;
+  expir_date: string;
+  info: string;
+  title: string;
+  status: boolean;
+};
 
 export default function Dashboard() {
-  const [cards, setCards] = useState<Card[]>([])
-  const [showPopup, setShowPopup] = useState(false)
-  const [name, setName] = useState('')
-  const [date, setDate] = useState('')
-  const [services, setServices] = useState<any[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [showPopup, setShowPopup] = useState(false);
+  const [name, setName] = useState('');
+  const [date, setDate] = useState('');
 
-  function getCookie(name: string) {
+  // Helper: get cookie by name
+  const getCookie = (name: string) => {
+    if (typeof document === 'undefined') return null;
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) {
-      return parts.pop()?.split(';').shift();
-    }
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
     return null;
-  }
+  };
 
-
+  // Fetch services on client
   useEffect(() => {
-    console.log("start");
+    if (typeof window === 'undefined') return; // فقط client
+
     const accessToken = getCookie('token');
-    const id = getCookie('id');
-    console.log(accessToken);
-    // if (!accessToken) {
-    //   window.location.href = '/login'
-    // }
-    async function list() {
+    const id = localStorage.getItem('id');
+
+    if (!accessToken || !id) {
+      console.log('No token or id found');
+      return;
+    }
+
+    async function fetchServices() {
       try {
         const res = await fetch(
           `http://94.131.118.165:3020/service/find?user_id=${id}`,
@@ -40,105 +46,65 @@ export default function Dashboard() {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${accessToken}`,
+              Authorization: `Bearer ${accessToken}`,
             },
           }
         );
-        console.log(res, "<<<<<<<<<<<<<<<<<<");
         const data = await res.json();
-        setServices(data.data.result);
+        setServices(data.data.result || []);
       } catch (error) {
-        console.log("error", error);
+        console.error('Error fetching services:', error);
       }
     }
-    list(),
-      // { Authorization: `Bearer ${getToken()}` }
-      //     { filter: { user_id: getTokenInfo().id } },
-      setCards([])
-  }, [])
 
-  // const toggleStatus = (id: number) => {
-  //   setCards(cards.map(c =>
-  //     // c.id === id ? { ...c, status: !c.status } : c
-  //   ))
-  // }
-
-  const deleteCard = (id: number) => {
-    // setCards(cards.filter(c => c.id !== id))
-  }
-
-  // const editCard = (id: number) => {
-  //   const newName = prompt('New name:')
-  //   if (!newName) return
-
-  //   setCards(cards.map(c =>
-  //     // c.id === id ? { ...c, name: newName } : c
-  //   ))
-  // }
+    fetchServices();
+  }, []);
 
   const downloadOvpn = (info: string, title: string) => {
-    const ovpnText = info; // یا data.data یا هر key که سرور برمی‌گرداند
-
-    // ساخت Blob
-    const blob = new Blob([ovpnText], { type: 'application/x-openvpn-profile' });
-
-    // ساخت لینک دانلود
+    const blob = new Blob([info], { type: 'application/x-openvpn-profile' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `${title}.ovpn`; // اسم فایل برای کاربر
+    link.download = `${title}.ovpn`;
     document.body.appendChild(link);
     link.click();
     link.remove();
-
-  }
+  };
 
   const createItem = async () => {
-    console.log(1);
-    const accessToken = localStorage.accessToken;
-    const id = localStorage.id;
-    const newCard: Card = {
-      name,
-      date,
-      id: 0
-    }
-    try {
-      console.log("start login");
+    const accessToken = localStorage.getItem('accessToken');
+    const id = localStorage.getItem('id');
 
-      if (!accessToken) {
-        alert('ایتدا وارد شوید!')
-      }
+    if (!accessToken || !id) {
+      alert('ابتدا وارد شوید!');
+      return;
+    }
+
+    try {
       const res = await fetch('http://94.131.118.165:3020/service/new', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ name, date, id }),
-      })
-      const data = await res.json(); // این JSON body را می‌خواند
-      console.log(data);
+      });
+      const data = await res.json();
 
-      const ovpnText = data.data.config; // یا data.data یا هر key که سرور برمی‌گرداند
+      // اضافه کردن سرویس جدید به state
+      setServices((prev) => [...prev, data.data]);
 
-      // ساخت Blob
-      const blob = new Blob([ovpnText], { type: 'application/x-openvpn-profile' });
+      // دانلود OVPN
+      downloadOvpn(data.data.config, data.data.title);
 
-      // ساخت لینک دانلود
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `${data.data.title}.ovpn`; // اسم فایل برای کاربر
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      // ریست فرم
+      setName('');
+      setDate('');
+      setShowPopup(false);
     } catch (err) {
-      console.error(err)
-      alert('Server error!')
+      console.error('Server error:', err);
+      alert('Server error!');
     }
-    setCards([...cards, newCard])
-    setShowPopup(false)
-    setName('')
-    setDate('')
-  }
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50 p-6">
@@ -149,50 +115,30 @@ export default function Dashboard() {
           onClick={() => setShowPopup(true)}
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
-          اکانت جدبد
+          اکانت جدید
         </button>
       </div>
 
-      {/* CARDS */}
+      {/* SERVICES */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {services.map((item) => (
           <div key={item.id} className="bg-white rounded-lg shadow p-4 flex flex-col">
             <h2 className="font-bold text-lg">{item.name}</h2>
-
             <p className="mb-2">تاریخ پایان سرویس: {item.expir_date}</p>
+
             <div className="mt-auto flex gap-1">
               <button
                 onClick={() => downloadOvpn(item.info, item.title)}
-                className="flex-1 rounded p-2  p-2 rounded bg-blue-500 hover:bg-blue-600 text-white transition flex items-center justify-center"
+                className="flex-1 rounded bg-blue-500 hover:bg-blue-600 text-white p-2 flex items-center justify-center"
                 title="دانلود"
               >
                 <ArrowDownTrayIcon className="w-5 h-5" />
               </button>
-              <button
-                // onClick={() => toggleStatus(item.id)}
-                className={`flex-1 rounded p-2 ${item.status
-                  ? "bg-green-700 text-white"
-                  : "bg-red-500 text-white"
-                  }`}
-              >
-                {item.status ? ' روشن' : 'خاموش'}
-              </button>
-
-
-            </div>
-            <div className="mt-2 flex gap-1">
-              <button
-                // onClick={() => editCard(item.id)}
-                className="flex-1 rounded bg-violet-500 hover:bg-violet-600 p-2 text-white transition"
-              >
-                ویرایش
-              </button>
 
               <button
-                onClick={() => deleteCard(item.id)}
-                className="flex-1 rounded bg-red-400 p-2 text-white hover:bg-red-600 p-2 text-white transition"
+                className={`flex-1 rounded p-2 ${item.status ? 'bg-green-700' : 'bg-red-500'} text-white`}
               >
-                حذف
+                {item.status ? 'روشن' : 'خاموش'}
               </button>
             </div>
           </div>
@@ -236,7 +182,5 @@ export default function Dashboard() {
         </div>
       )}
     </div>
-  )
+  );
 }
-
-
